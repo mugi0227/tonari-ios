@@ -2,13 +2,11 @@ name: Tonari iOS build
 
 # Public iOS shell only; no access to the private submitted repository.
 on:
-  push:
-    branches: [main]
-    paths: ['ios/**', 'scripts/ios/**', '.github/workflows/ios-testflight.yml']
   workflow_dispatch:
 
 permissions:
   contents: read
+  actions: read
 concurrency:
   group: tonari-ios-xcode263
   cancel-in-progress: false
@@ -26,23 +24,15 @@ jobs:
         with:
           fetch-depth: 0
           ref: ${{ github.sha }}
+      - name: Require the same native source to have passed UI checks
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: python3 scripts/ios/check_tested_source.py
       - name: Install XcodeGen
         run: brew install xcodegen
       - name: Generate the native project
         working-directory: ios
         run: xcodebuild -version && xcodegen generate
-      - name: Select an iPhone simulator with a bounded wait
-        run: python3 -u scripts/ios/select_simulator.py
-      - name: Simulator tests and screenshots
-        working-directory: ios
-        run: |
-          set -o pipefail
-          xcodebuild test -project Tonari.xcodeproj -scheme Tonari -configuration Debug \
-            -destination "platform=iOS Simulator,id=$SIMULATOR_UDID" \
-            -resultBundlePath "$RUNNER_TEMP/TonariTests.xcresult" \
-            -parallel-testing-enabled NO -destination-timeout 120 \
-            -test-timeouts-enabled YES -default-test-execution-time-allowance 90 -maximum-test-execution-time-allowance 120 \
-            CODE_SIGNING_ALLOWED=NO 2>&1 | tee "$RUNNER_TEMP/test.log" | xcbeautify
       - name: Check signing secrets
         env:
           ASC_KEY_ID: ${{ secrets.ASC_KEY_ID }}
@@ -91,12 +81,6 @@ jobs:
             -authenticationKeyID "$ASC_KEY_ID" -authenticationKeyIssuerID "$ASC_ISSUER_ID" \
             2>&1 | tee "$RUNNER_TEMP/export.log" | xcbeautify
           echo "Source: $GITHUB_SHA; 0.1.0 ($BUILD_NUMBER). No private application source included." >> "$GITHUB_STEP_SUMMARY"
-      - name: Export test screenshots
-        if: always()
-        run: |
-          if [ -d "$RUNNER_TEMP/TonariTests.xcresult" ]; then
-            xcrun xcresulttool export attachments --path "$RUNNER_TEMP/TonariTests.xcresult" --output-path "$RUNNER_TEMP/screenshots" || true
-          fi
       - name: Remove temporary credentials
         if: always()
         run: |
@@ -109,8 +93,6 @@ jobs:
           path: |
             ${{ runner.temp }}/export/*.ipa
             ${{ runner.temp }}/archive-verification.json
-            ${{ runner.temp }}/test.log
             ${{ runner.temp }}/archive.log
             ${{ runner.temp }}/export.log
-            ${{ runner.temp }}/screenshots/
           retention-days: 14
