@@ -61,6 +61,7 @@ final class TonariUITests: XCTestCase {
         retry.tap()
         XCTAssertTrue(retry.exists)
         rotate(.landscapeLeft, app: app, landscape: true)
+        XCTAssertTrue(retry.isHittable)
         attach(app, "offline-landscape")
         rotate(.portrait, app: app, landscape: false)
     }
@@ -87,7 +88,11 @@ final class TonariUITests: XCTestCase {
         XCTAssertEqual(XCTWaiter.wait(for: [settled], timeout: 10), .completed)
     }
     private func attach(_ app: XCUIApplication, _ name: String) {
-        let item = XCTAttachment(screenshot: app.screenshot())
+        // An application-element screenshot can crop a rotated simulator using
+        // portrait coordinates. Capture the device screen for layout review.
+        let item = XCTAttachment(screenshot: XCUIScreen.main.screenshot())
         item.name = name; item.lifetime = .keepAlways; add(item)
+        let hierarchy = XCTAttachment(string: app.debugDescription)
+        hierarchy.name = name + "-hierarchy"; hierarchy.lifetime = .keepAlways; add(hierarchy)
     }
 }
