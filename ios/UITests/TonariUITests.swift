@@ -46,19 +46,22 @@ final class TonariUITests: XCTestCase {
         attach(app, "recording-export")
         XCTAssertTrue(exported, app.debugDescription)
         // iOS exposes the share-sheet filename as Other, rather than StaticText.
-        XCTAssertTrue(app.otherElements["tonari-test"].exists)
-        XCTAssertTrue(app.cells["Save to Files"].exists || app.cells["ファイルに保存"].exists)
+        let filename = app.descendants(matching: .any).matching(NSPredicate(format: "label == %@", "tonari-test")).firstMatch
+        XCTAssertTrue(filename.waitForExistence(timeout: 5))
+        XCTAssertTrue(app.cells["Save to Files"].waitForExistence(timeout: 5) || app.cells["ファイルに保存"].exists)
     }
     func testOfflineRetryAndLandscapeLayout() {
         let app = XCUIApplication()
         app.launchArguments = ["--ui-offline"]
         app.launch()
-        XCTAssertTrue(app.buttons["retry"].waitForExistence(timeout: 10))
-        app.buttons["retry"].tap()
-        XCTAssertTrue(app.buttons["retry"].exists)
-        XCUIDevice.shared.orientation = .landscapeLeft
+        // SwiftUI can propagate a parent accessibility identifier to children.
+        let retry = app.buttons["もう一度接続する"]
+        XCTAssertTrue(retry.waitForExistence(timeout: 10))
+        retry.tap()
+        XCTAssertTrue(retry.exists)
+        rotate(.landscapeLeft, app: app, landscape: true)
         attach(app, "offline-landscape")
-        XCUIDevice.shared.orientation = .portrait
+        rotate(.portrait, app: app, landscape: false)
     }
     func testLiveLandingReadOnly() {
         let app = XCUIApplication()
@@ -67,9 +70,20 @@ final class TonariUITests: XCTestCase {
         // No sign-in, guest creation, AI request, or record mutations.
         XCTAssertTrue(app.buttons["ゲストで見る（架空のデータ）"].waitForExistence(timeout: 55))
         attach(app, "live-landing")
-        XCUIDevice.shared.orientation = .landscapeLeft
+        rotate(.landscapeLeft, app: app, landscape: true)
         attach(app, "live-landing-landscape")
-        XCUIDevice.shared.orientation = .portrait
+        rotate(.portrait, app: app, landscape: false)
+    }
+    private func rotate(_ orientation: UIDeviceOrientation, app: XCUIApplication, landscape: Bool) {
+        XCUIDevice.shared.orientation = orientation
+        var lastFrame = CGRect.zero
+        var stableSince = Date()
+        let settled = XCTNSPredicateExpectation(predicate: NSPredicate { _, _ in
+            let frame = app.frame
+            if frame != lastFrame { lastFrame = frame; stableSince = Date() }
+            return (frame.width > frame.height) == landscape && Date().timeIntervalSince(stableSince) >= 1
+        }, object: nil)
+        XCTAssertEqual(XCTWaiter.wait(for: [settled], timeout: 10), .completed)
     }
     private func attach(_ app: XCUIApplication, _ name: String) {
         let item = XCTAttachment(screenshot: app.screenshot())
