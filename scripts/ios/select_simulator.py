@@ -10,6 +10,8 @@ result = subprocess.run(["xcrun","simctl","list","devices","available","-j"],
 groups = json.loads(result.stdout)["devices"]
 candidates = [(runtime,device) for runtime,devices in groups.items() if ".iOS-" in runtime
               for device in devices if device["name"].startswith("iPhone") and device.get("isAvailable")]
+if os.environ.get("SIMULATOR_RUNTIME"):
+    candidates = [(runtime,device) for runtime,device in candidates if os.environ["SIMULATOR_RUNTIME"] in runtime]
 assert candidates, "No available iPhone runtime is installed on this runner"
 candidates.sort(key=lambda item: (item[1]["name"] == "iPhone 17 Pro", item[0]),reverse=True)
 runtime,device = candidates[0]

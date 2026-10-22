@@ -1,0 +1,57 @@
+name: Tonari iOS simulator checks
+
+# Public iOS shell only; no access to the private submitted repository.
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+concurrency:
+  group: tonari-ios-simulator185
+  cancel-in-progress: false
+jobs:
+  build:
+    runs-on: macos-15
+    timeout-minutes: 35
+    env:
+      DEVELOPER_DIR: /Applications/Xcode_16.4.app/Contents/Developer
+      NSUnbufferedIO: YES
+      BUILD_NUMBER: ${{ github.run_number }}
+      SIMULATOR_RUNTIME: iOS-18-5
+      TEAM_ID: 572NVCGLGQ
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          fetch-depth: 0
+          ref: ${{ github.sha }}
+      - name: Install XcodeGen
+        run: brew install xcodegen
+      - name: Generate the native project
+        working-directory: ios
+        run: xcodebuild -version && xcodegen generate
+      - name: Select an iPhone simulator with a bounded wait
+        run: python3 -u scripts/ios/select_simulator.py
+      - name: Simulator tests and screenshots
+        working-directory: ios
+        run: |
+          set -o pipefail
+          xcodebuild test -project Tonari.xcodeproj -scheme Tonari -configuration Debug \
+            -destination "platform=iOS Simulator,id=$SIMULATOR_UDID" \
+            -resultBundlePath "$RUNNER_TEMP/TonariTests.xcresult" \
+            -parallel-testing-enabled NO -destination-timeout 120 \
+            -test-timeouts-enabled YES -default-test-execution-time-allowance 90 -maximum-test-execution-time-allowance 120 \
+            CODE_SIGNING_ALLOWED=NO 2>&1 | tee "$RUNNER_TEMP/test.log" | xcbeautify
+      - name: Export test screenshots
+        if: always()
+        run: |
+          if [ -d "$RUNNER_TEMP/TonariTests.xcresult" ]; then
+            xcrun xcresulttool export attachments --path "$RUNNER_TEMP/TonariTests.xcresult" --output-path "$RUNNER_TEMP/screenshots" || true
+          fi
+      - uses: actions/upload-artifact@v5
+        if: always()
+        with:
+          name: tonari-ios-checks-${{ github.run_number }}
+          path: |
+            ${{ runner.temp }}/test.log
+            ${{ runner.temp }}/screenshots/
+          retention-days: 14
