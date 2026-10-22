@@ -6,9 +6,8 @@ on:
 
 permissions:
   contents: read
-concurrency:
-  group: tonari-ios-simulator185
-  cancel-in-progress: false
+# Checks run in isolated simulators and never install signing credentials.
+# Do not let a cancelled runner hold up a new verification run.
 jobs:
   build:
     runs-on: macos-15
