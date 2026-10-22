@@ -19,10 +19,18 @@ Web/APIの非公開ソース、ハッカソン提出物、認証情報、利用�
 ## ビルド
 
 GitHub ActionsでXcodeGen生成、Simulator検査、配布署名済みIPAを作ります。
+3つのworkflowはすべて手動実行です。
+`ios-tests.yml` はXcode 16.4 / iOS 18.5で検査し、`ios-device.yml` はXcode 26.3で実機用IPAを書き出します。
+`ios-testflight.yml` は同じiOSソースのSimulator成功を確認してから配布用ビルドを行います。
 既存のApple Distribution証明書を再利用し、新規発行や失効はしません。
 署名情報はGitHub Actions Secretsに保存します。
 Apple側のアプリ登録後に `TONARI_TESTFLIGHT_UPLOAD=true` を設定してアップロードします。
 App Storeの一般公開には提出しません。
 
-現在の検証結果はActionsを参照してください。
+0.1.0/build 2の[実機用ビルド](https://github.com/mugi0227/tonari-ios/actions/runs/39707086571)が成功しています。
+Appleへの送信とTestFlight配布は、新規アプリ登録待ちです。
+単体4件・画面操作4件の[検査](https://github.com/mugi0227/tonari-ios/actions/runs/39707966520)も成功しています。
 実iPhoneでの確認は別に必要です。
+
+全画面を撮影した[追加検査](https://github.com/mugi0227/tonari-ios/actions/runs/39708829012)も8件成功しています。
+画面画像は [docs/screenshots](docs/screenshots/) にあり、ログイン前または架空の確認用データだけを使っています。

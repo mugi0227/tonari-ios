@@ -1,0 +1,32 @@
+{
+  "ciRun": "https://github.com/mugi0227/tonari-ios/actions/runs/39708829012",
+  "device": "iPhone 16 Pro",
+  "runtime": "iOS 18.5",
+  "capture": "XCUIScreen.main.screenshot",
+  "screenshots": [
+    {
+      "file": "recording-export.png",
+      "sha256": "5b84046a4bdbbe97cc4054a3ad743223d8eda7d227ccda869f3450cb8d908352",
+      "sourceTest": "TonariUITests/testBlobRecordingExportOpensNativeShareSheet()",
+      "syntheticOrUnauthenticated": true
+    },
+    {
+      "file": "landing-landscape.png",
+      "sha256": "b3e3280e73cc7035b3fcb22f44231ec373e2ad6a751f7b073b33449c6bd18e0d",
+      "sourceTest": "TonariUITests/testLiveLandingReadOnly()",
+      "syntheticOrUnauthenticated": true
+    },
+    {
+      "file": "landing.png",
+      "sha256": "1dc7534f3ea4a1e9c1a2c210b9391ed7d6f32d9eb68301d028f13d9425524b7d",
+      "sourceTest": "TonariUITests/testLiveLandingReadOnly()",
+      "syntheticOrUnauthenticated": true
+    },
+    {
+      "file": "offline-landscape.png",
+      "sha256": "48893f4f26c4cb1417d8e87bec65664f511cb9a552d5c31d99dcb2a0180133a4",
+      "sourceTest": "TonariUITests/testOfflineRetryAndLandscapeLayout()",
+      "syntheticOrUnauthenticated": true
+    }
+  ]
+}
