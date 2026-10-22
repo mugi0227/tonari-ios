@@ -1,4 +1,4 @@
-name: Tonari iOS — preserve submitted main
+name: Tonari iOS build
 
 # Public iOS shell only; no access to the private submitted repository.
 on:
@@ -10,7 +10,7 @@ on:
 permissions:
   contents: read
 concurrency:
-  group: tonari-ios
+  group: tonari-ios-xcode263
   cancel-in-progress: false
 jobs:
   build:
