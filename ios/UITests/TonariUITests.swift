@@ -41,10 +41,13 @@ final class TonariUITests: XCTestCase {
         let app = fixture()
         app.buttons["録音を書き出す"].tap()
         // UIActivityViewController exposes the system share sheet, including Copy.
-        let filename = app.staticTexts.matching(NSPredicate(format: "label CONTAINS %@", "tonari-test")).firstMatch
-        let exported = filename.waitForExistence(timeout: 12)
+        let sheet = app.otherElements["ActivityListView"]
+        let exported = sheet.waitForExistence(timeout: 12)
         attach(app, "recording-export")
         XCTAssertTrue(exported, app.debugDescription)
+        // iOS exposes the share-sheet filename as Other, rather than StaticText.
+        XCTAssertTrue(app.otherElements["tonari-test"].exists)
+        XCTAssertTrue(app.cells["Save to Files"].exists || app.cells["ファイルに保存"].exists)
     }
     func testOfflineRetryAndLandscapeLayout() {
         let app = XCUIApplication()

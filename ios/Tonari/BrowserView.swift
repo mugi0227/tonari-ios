@@ -61,7 +61,9 @@ final class BrowserController: UIViewController, WKNavigationDelegate, WKUIDeleg
         microphoneObserver = webView.observe(\.microphoneCaptureState, options: [.new]) { web, _ in
             Task { @MainActor in UIApplication.shared.isIdleTimerDisabled = web.microphoneCaptureState != .none }
         }
-        loadHome()
+        // SwiftUI must finish subscribing to the model before a synchronous
+        // offline/error result can publish state from this UIKit controller.
+        DispatchQueue.main.async { [weak self] in self?.loadHome() }
     }
 
     func loadHome() {
