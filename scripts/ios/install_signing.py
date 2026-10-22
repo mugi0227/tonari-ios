@@ -51,6 +51,15 @@ def main():
         with urllib.request.urlopen(request, timeout=30) as response:
             return json.load(response)
 
+    if os.environ['DESTINATION'] == 'upload':
+        query = urllib.parse.urlencode({'filter[bundleId]': 'jp.mugilab.tonari'})
+        apps = api('/v1/apps?' + query)['data']
+        assert len(apps) == 1, 'Create the Tonari app record in App Store Connect first'
+        query = urllib.parse.urlencode({'filter[app]': apps[0]['id'],
+            'filter[version]': os.environ['BUILD_NUMBER']})
+        existing = api('/v1/builds?' + query)['data']
+        assert not existing, 'This build already exists in Apple; verify it instead of uploading again'
+
     certificate = api('/v1/certificates/' + CERTIFICATE_ID)['data']['attributes']
     certificate_bytes = base64.b64decode(certificate['certificateContent'])
     cert = x509.load_der_x509_certificate(certificate_bytes)

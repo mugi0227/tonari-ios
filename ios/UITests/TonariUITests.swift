@@ -22,9 +22,12 @@ final class TonariUITests: XCTestCase {
         let expected = memo.value as? String
         app.buttons["端末に保存"].tap()
         XCTAssertTrue(app.staticTexts["保存しました"].waitForExistence(timeout: 5))
+        app.buttons["確認用の録音を保存"].tap()
+        XCTAssertTrue(app.staticTexts["録音の保存を確認しました"].waitForExistence(timeout: 5))
         app.terminate(); app.launch()
         XCTAssertTrue(app.textFields["保存するメモ"].waitForExistence(timeout: 15))
         XCTAssertEqual(app.textFields["保存するメモ"].value as? String, expected)
+        XCTAssertTrue(app.staticTexts["録音の保存を確認しました"].waitForExistence(timeout: 5))
         app.buttons["確認ダイアログ"].tap()
         XCTAssertTrue(app.alerts["となり"].waitForExistence(timeout: 5))
         app.alerts.buttons["キャンセル"].tap()

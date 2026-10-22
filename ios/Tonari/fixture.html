@@ -1,1 +1,36 @@
-<!doctype html><html lang="ja"><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><style>body{font:18px system-ui;background:#f4f8fc;color:#0c2a44;padding:20px}button{display:block;margin:16px 0;min-height:48px;font:inherit}input{font:inherit;width:90%}</style><h1>となりの動作確認</h1><p>この画面の内容は架空です。</p><label>保存するメモ<input id="memo" aria-label="保存するメモ"></label><button id="save">端末に保存</button><p id="saved"></p><button id="confirm">確認ダイアログ</button><p id="result"></p><button id="download">録音を書き出す</button><script>memo.value=localStorage.getItem('tonari-ios-test')||'';save.onclick=()=>{localStorage.setItem('tonari-ios-test',memo.value);saved.textContent='保存しました'};document.getElementById('confirm').onclick=()=>{result.textContent=confirm('この操作を続けますか？')?'確認して続けました':'取り消しました'};download.onclick=()=>{const b=new Blob(['Tonari fixture export'],{type:'audio/mp4'});const a=document.createElement('a');a.href=URL.createObjectURL(b);a.download='tonari-test.m4a';a.click();setTimeout(()=>URL.revokeObjectURL(a.href),30000)};</script></html>
+<!doctype html><html lang="ja"><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<style>body{font:18px system-ui;background:#f4f8fc;color:#0c2a44;padding:20px}button{display:block;margin:12px 0;min-height:44px;font:inherit}input{font:inherit;width:90%}</style>
+<h1>となりの動作確認</h1><p>この画面の内容は架空です。</p>
+<label>保存するメモ<input id="memo" aria-label="保存するメモ"></label>
+<button id="save">端末に保存</button><p id="saved"></p>
+<button id="save-recording">確認用の録音を保存</button><p id="recording-status"></p>
+<button id="confirm">確認ダイアログ</button><p id="result"></p>
+<button id="download">録音を書き出す</button>
+<script>
+memo.value=localStorage.getItem('tonari-ios-test')||'';
+save.onclick=()=>{localStorage.setItem('tonari-ios-test',memo.value);saved.textContent='保存しました'};
+document.getElementById('confirm').onclick=()=>{result.textContent=confirm('この操作を続けますか？')?'確認して続けました':'取り消しました'};
+const opened=indexedDB.open('tonari-native-qa',1);
+opened.onupgradeneeded=()=>opened.result.createObjectStore('recordings');
+opened.onsuccess=()=>{
+ const db=opened.result;
+ const check=()=>{
+  const read=db.transaction('recordings').objectStore('recordings').get('test');
+  read.onsuccess=async()=>{
+   if(read.result instanceof Blob && await read.result.text()==='fictional-recording')
+    document.getElementById('recording-status').textContent='録音の保存を確認しました';
+  };
+ };
+ check();
+ document.getElementById('save-recording').onclick=()=>{
+  const tx=db.transaction('recordings','readwrite');
+  tx.objectStore('recordings').put(new Blob(['fictional-recording'],{type:'audio/mp4'}),'test');
+  tx.oncomplete=check;
+ };
+};
+download.onclick=()=>{
+ const b=new Blob(['Tonari fixture export'],{type:'audio/mp4'});
+ const a=document.createElement('a');a.href=URL.createObjectURL(b);a.download='tonari-test.m4a';a.click();
+ setTimeout(()=>URL.revokeObjectURL(a.href),30000);
+};
+</script></html>
