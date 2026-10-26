@@ -28,5 +28,14 @@
       "sourceTest": "TonariUITests/testOfflineRetryAndLandscapeLayout()",
       "syntheticOrUnauthenticated": true
     }
-  ]
+  ],
+  "testflightDistribution": {
+    "file": "testflight-0.1.0-7.png",
+    "sha256": "13e3d95833b1b4e071c4098d0ad47eb7ce4ee7efe43c673c7f8bcf3231fb8f0c",
+    "capture": "App Store Connect browser screenshot crop",
+    "accountInformationExcluded": true,
+    "version": "0.1.0",
+    "build": "7",
+    "dateJST": "2026-10-26"
+  }
 }

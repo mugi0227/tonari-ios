@@ -27,10 +27,10 @@ GitHub ActionsでXcodeGen生成、Simulator検査、配布署名済みIPAを作�
 Apple側のアプリ登録後に `TONARI_TESTFLIGHT_UPLOAD=true` を設定してアップロードします。
 App Storeの一般公開には提出しません。
 
-0.1.0/build 2の[実機用ビルド](https://github.com/mugi0227/tonari-ios/actions/runs/39707086571)が成功しています。
-Appleへの送信とTestFlight配布は、新規アプリ登録待ちです。
-単体4件・画面操作4件の[検査](https://github.com/mugi0227/tonari-ios/actions/runs/39707966520)も成功しています。
-実iPhoneでの確認は別に必要です。
+2026/10/26に **0.1.0 (7)をTestFlightへ配布しました**。
+[配布ビルド](https://github.com/mugi0227/tonari-ios/actions/runs/40321246531)が成功し、Appleの処理完了と内部テスト中を確認しています。
+本人のみの内部グループです。[iPhoneでのインストール手順](docs/testflight-readiness.md)を参照してください。
+実iPhoneでのログイン・マイク・写真の確認はこれからです。
 
 全画面を撮影した[追加検査](https://github.com/mugi0227/tonari-ios/actions/runs/39708829012)も8件成功しています。
-画面画像は [docs/screenshots](docs/screenshots/) にあり、ログイン前または架空の確認用データだけを使っています。
+画面画像は [docs/screenshots](docs/screenshots/) にあります。アプリ画面はログイン前または架空の確認用データ、配布状況の画面はアカウント情報を除いたものです。
