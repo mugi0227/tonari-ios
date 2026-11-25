@@ -34,8 +34,10 @@ GitHub → Actions で手動実行します。`source_ref`には、非公開リ�
 デプロイキーの作り方（Windows の PowerShell）：
 
 ```powershell
-ssh-keygen -t ed25519 -C "tonari-ios build" -f tonari_deploy -N '""'
+ssh-keygen -t ed25519 -C "tonari-ios build" -f tonari_deploy
 ```
+
+パスフレーズを聞かれたら、何も入れずにEnterを2回押します。
 
 1. `tonari_deploy.pub`の中身を、非公開リポジトリ → Settings → Deploy keys → Add deploy key に貼る（「Allow write access」は付けない）
 2. `tonari_deploy`の中身を、このリポジトリの Secret `APP_SOURCE_DEPLOY_KEY` に貼る
