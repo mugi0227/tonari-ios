@@ -1,0 +1,79 @@
+name: Prepare the Tonari app
+description: >
+  Check out the private app source with a read-only deploy key, test and build the bundled web
+  app, add the Firebase config and generate the Xcode project. Nothing from the source is printed
+  or uploaded; only file names appear in the build log.
+inputs:
+  repository:
+    description: Private repository holding the app source
+    required: true
+  ref:
+    description: Branch, tag or commit of the app source
+    required: true
+  deploy-key:
+    description: Read-only deploy key of the private repository
+    required: true
+  firebase-plist:
+    description: GoogleService-Info.plist, base64
+    required: false
+    default: ''
+  require-firebase:
+    description: Fail when the Firebase config is missing
+    required: false
+    default: 'false'
+outputs:
+  sha:
+    description: Commit of the app source that was built
+    value: ${{ steps.source.outputs.sha }}
+runs:
+  using: composite
+  steps:
+    - name: Check that the deploy key is set
+      shell: bash
+      env:
+        KEY: ${{ inputs.deploy-key }}
+      run: |
+        if [ -z "$KEY" ]; then
+          echo "::error::APP_SOURCE_DEPLOY_KEY is not set (see README: read-only deploy key of the private app repository)"
+          exit 1
+        fi
+    - name: Check out the app source (private)
+      uses: actions/checkout@v5
+      with:
+        repository: ${{ inputs.repository }}
+        ref: ${{ inputs.ref }}
+        ssh-key: ${{ inputs.deploy-key }}
+        path: app
+        persist-credentials: false
+    - id: source
+      name: Record the source commit
+      shell: bash
+      run: echo "sha=$(git -C app rev-parse HEAD)" >> "$GITHUB_OUTPUT"
+    - uses: actions/setup-node@v5
+      with:
+        node-version: 22
+        cache: npm
+        cache-dependency-path: app/package-lock.json
+    - name: Test the app logic and bundle the web app
+      shell: bash
+      working-directory: app
+      run: npm ci --no-audit --no-fund && npm test --silent && npm run ios:web --silent
+    - name: Add the Firebase config
+      shell: bash
+      env:
+        PLIST: ${{ inputs.firebase-plist }}
+        REQUIRE: ${{ inputs.require-firebase }}
+      run: |
+        if [ -n "$PLIST" ]; then
+          umask 077
+          printf '%s' "$PLIST" | base64 --decode > app/ios/Tonari/GoogleService-Info.plist
+          plutil -lint app/ios/Tonari/GoogleService-Info.plist
+        elif [ "$REQUIRE" = "true" ]; then
+          echo "::error::GOOGLE_SERVICE_INFO_PLIST is not set"; exit 1
+        else
+          echo "::warning::GOOGLE_SERVICE_INFO_PLIST is not set; Ram's replies are unavailable in this build"
+        fi
+    - name: Generate the Xcode project
+      shell: bash
+      working-directory: app/ios
+      run: brew install xcodegen >/dev/null && xcodebuild -version && xcodegen generate

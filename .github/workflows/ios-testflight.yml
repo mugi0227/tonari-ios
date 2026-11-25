@@ -1,38 +1,53 @@
 name: Tonari iOS build
 
-# Public iOS shell only; no access to the private submitted repository.
+# Simulator checks, then a signed archive of the same app source, uploaded to TestFlight.
+# The IPA is never kept as an artifact here: this repository is public and the IPA carries the
+# bundled app source.
 on:
   workflow_dispatch:
+    inputs:
+      source_ref:
+        description: App source branch, tag or commit (private repository)
+        required: true
+        default: claude/tonari-ios-ai-only-rt87vw
 
 permissions:
   contents: read
-  actions: read
 concurrency:
-  group: tonari-ios-xcode263
+  group: tonari-ios-release
   cancel-in-progress: false
 jobs:
-  build:
+  test:
+    uses: ./.github/workflows/ios-tests.yml
+    with:
+      source_ref: ${{ inputs.source_ref }}
+    secrets: inherit
+
+  release:
+    needs: test
     runs-on: macos-15
-    timeout-minutes: 35
+    timeout-minutes: 45
     env:
       DEVELOPER_DIR: /Applications/Xcode_26.3.app/Contents/Developer
       NSUnbufferedIO: YES
-      BUILD_NUMBER: ${{ github.run_number }}
       TEAM_ID: 572NVCGLGQ
+      MARKETING_VERSION: 0.2.0
+      # Build numbers stay above the builds already uploaded.
+      BUILD_OFFSET: 100
     steps:
+      - name: Build number
+        run: echo "BUILD_NUMBER=$((GITHUB_RUN_NUMBER + BUILD_OFFSET))" >> "$GITHUB_ENV"
       - uses: actions/checkout@v5
         with:
-          fetch-depth: 0
-          ref: ${{ github.sha }}
-      - name: Require the same native source to have passed UI checks
-        env:
-          GH_TOKEN: ${{ github.token }}
-        run: python3 scripts/ios/check_tested_source.py
-      - name: Install XcodeGen
-        run: brew install xcodegen
-      - name: Generate the native project
-        working-directory: ios
-        run: xcodebuild -version && xcodegen generate
+          persist-credentials: false
+      - id: app
+        uses: ./.github/actions/prepare-app
+        with:
+          repository: ${{ vars.APP_SOURCE_REPO || 'mugi0227/Tonari' }}
+          ref: ${{ needs.test.outputs.sha }}
+          deploy-key: ${{ secrets.APP_SOURCE_DEPLOY_KEY }}
+          firebase-plist: ${{ secrets.GOOGLE_SERVICE_INFO_PLIST }}
+          require-firebase: 'true'
       - name: Check signing secrets
         env:
           ASC_KEY_ID: ${{ secrets.ASC_KEY_ID }}
@@ -48,6 +63,7 @@ jobs:
           printf '%s\n' "$ASC_KEY_P8" > "$RUNNER_TEMP/AuthKey.p8"
           echo "ASC_KEY_PATH=$RUNNER_TEMP/AuthKey.p8" >> "$GITHUB_ENV"
       - name: Install the existing distribution identity
+        working-directory: app
         env:
           ASC_KEY_ID: ${{ secrets.ASC_KEY_ID }}
           ASC_ISSUER_ID: ${{ secrets.ASC_ISSUER_ID }}
@@ -60,16 +76,16 @@ jobs:
           "$RUNNER_TEMP/signing-env/bin/python" scripts/ios/install_signing.py
           cd ios && xcodegen generate
       - name: Archive and verify distribution signing
-        working-directory: ios
+        working-directory: app/ios
         run: |
           set -o pipefail
           xcodebuild archive -project Tonari.xcodeproj -scheme Tonari -configuration Release \
             -destination 'generic/platform=iOS' -archivePath "$RUNNER_TEMP/Tonari.xcarchive" \
             CODE_SIGN_STYLE=Manual DEVELOPMENT_TEAM="$TEAM_ID" CURRENT_PROJECT_VERSION="$BUILD_NUMBER" \
-            2>&1 | tee "$RUNNER_TEMP/archive.log" | xcbeautify
+            2>&1 | xcbeautify --quiet
           python3 ../scripts/ios/verify_archive.py "$RUNNER_TEMP/Tonari.xcarchive/Products/Applications/Tonari.app"
-      - name: Export signed IPA or upload when the Apple app record is ready
-        working-directory: ios
+      - name: Upload to TestFlight (or export only, when uploads are off)
+        working-directory: app/ios
         env:
           ASC_KEY_ID: ${{ secrets.ASC_KEY_ID }}
           ASC_ISSUER_ID: ${{ secrets.ASC_ISSUER_ID }}
@@ -79,20 +95,18 @@ jobs:
             -exportOptionsPlist "$RUNNER_TEMP/Tonari-ExportOptions.plist" -exportPath "$RUNNER_TEMP/export" \
             -allowProvisioningUpdates -authenticationKeyPath "$ASC_KEY_PATH" \
             -authenticationKeyID "$ASC_KEY_ID" -authenticationKeyIssuerID "$ASC_ISSUER_ID" \
-            2>&1 | tee "$RUNNER_TEMP/export.log" | xcbeautify
-          echo "Source: $GITHUB_SHA; 0.1.0 ($BUILD_NUMBER). No private application source included." >> "$GITHUB_STEP_SUMMARY"
-      - name: Remove temporary credentials
+            2>&1 | xcbeautify --quiet
+          echo "App source ${{ needs.test.outputs.sha }}; $MARKETING_VERSION ($BUILD_NUMBER)." >> "$GITHUB_STEP_SUMMARY"
+      - name: Remove temporary credentials and build products
         if: always()
         run: |
           rm -f "$RUNNER_TEMP/AuthKey.p8"
+          rm -rf "$RUNNER_TEMP/export" "$RUNNER_TEMP/Tonari.xcarchive"
           if [ -n "${TONARI_SIGNING_KEYCHAIN:-}" ]; then security delete-keychain "$TONARI_SIGNING_KEYCHAIN"; fi
       - uses: actions/upload-artifact@v5
         if: always()
         with:
-          name: tonari-ios-${{ github.run_number }}
-          path: |
-            ${{ runner.temp }}/export/*.ipa
-            ${{ runner.temp }}/archive-verification.json
-            ${{ runner.temp }}/archive.log
-            ${{ runner.temp }}/export.log
+          name: tonari-ios-verification-${{ github.run_number }}
+          path: ${{ runner.temp }}/archive-verification.json
+          if-no-files-found: ignore
           retention-days: 14

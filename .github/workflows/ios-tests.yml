@@ -1,37 +1,52 @@
 name: Tonari iOS simulator checks
 
-# Public iOS shell only; no access to the private submitted repository.
+# Build-only public repository: the app source is private and checked out at run time with a
+# read-only deploy key. Only simulator screenshots (fictional data) are kept as artifacts.
 on:
   workflow_dispatch:
+    inputs:
+      source_ref:
+        description: App source branch, tag or commit (private repository)
+        required: true
+        default: claude/tonari-ios-ai-only-rt87vw
+  workflow_call:
+    inputs:
+      source_ref:
+        type: string
+        required: true
+    outputs:
+      sha:
+        description: Commit of the app source that passed
+        value: ${{ jobs.test.outputs.sha }}
 
 permissions:
   contents: read
-# Checks run in isolated simulators and never install signing credentials.
-# Do not let a cancelled runner hold up a new verification run.
 jobs:
-  build:
+  test:
     runs-on: macos-15
-    timeout-minutes: 35
+    timeout-minutes: 45
+    outputs:
+      sha: ${{ steps.app.outputs.sha }}
     env:
       DEVELOPER_DIR: /Applications/Xcode_16.4.app/Contents/Developer
       NSUnbufferedIO: YES
-      BUILD_NUMBER: ${{ github.run_number }}
       SIMULATOR_RUNTIME: iOS-18-5
-      TEAM_ID: 572NVCGLGQ
     steps:
       - uses: actions/checkout@v5
         with:
-          fetch-depth: 0
-          ref: ${{ github.sha }}
-      - name: Install XcodeGen
-        run: brew install xcodegen
-      - name: Generate the native project
-        working-directory: ios
-        run: xcodebuild -version && xcodegen generate
+          persist-credentials: false
+      - id: app
+        uses: ./.github/actions/prepare-app
+        with:
+          repository: ${{ vars.APP_SOURCE_REPO || 'mugi0227/Tonari' }}
+          ref: ${{ inputs.source_ref }}
+          deploy-key: ${{ secrets.APP_SOURCE_DEPLOY_KEY }}
+          firebase-plist: ${{ secrets.GOOGLE_SERVICE_INFO_PLIST }}
       - name: Select an iPhone simulator with a bounded wait
+        working-directory: app
         run: python3 -u scripts/ios/select_simulator.py
       - name: Simulator tests and screenshots
-        working-directory: ios
+        working-directory: app/ios
         run: |
           set -o pipefail
           xcodebuild test -project Tonari.xcodeproj -scheme Tonari -configuration Debug \
@@ -39,18 +54,20 @@ jobs:
             -resultBundlePath "$RUNNER_TEMP/TonariTests.xcresult" \
             -parallel-testing-enabled NO -destination-timeout 120 \
             -test-timeouts-enabled YES -default-test-execution-time-allowance 90 -maximum-test-execution-time-allowance 120 \
-            CODE_SIGNING_ALLOWED=NO 2>&1 | tee "$RUNNER_TEMP/test.log" | xcbeautify
+            CODE_SIGNING_ALLOWED=NO 2>&1 | xcbeautify --quiet
       - name: Export test screenshots
         if: always()
         run: |
           if [ -d "$RUNNER_TEMP/TonariTests.xcresult" ]; then
             xcrun xcresulttool export attachments --path "$RUNNER_TEMP/TonariTests.xcresult" --output-path "$RUNNER_TEMP/screenshots" || true
+            # Keep images only; hierarchy dumps stay off a public artifact.
+            find "$RUNNER_TEMP/screenshots" -type f ! -name '*.png' ! -name '*.jpeg' ! -name '*.jpg' -delete 2>/dev/null || true
           fi
+          echo "Tested app source: ${{ steps.app.outputs.sha }}" >> "$GITHUB_STEP_SUMMARY"
       - uses: actions/upload-artifact@v5
         if: always()
         with:
-          name: tonari-ios-checks-${{ github.run_number }}
-          path: |
-            ${{ runner.temp }}/test.log
-            ${{ runner.temp }}/screenshots/
+          name: tonari-ios-screenshots-${{ github.run_number }}
+          path: ${{ runner.temp }}/screenshots/
+          if-no-files-found: ignore
           retention-days: 14
