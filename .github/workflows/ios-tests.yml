@@ -55,6 +55,25 @@ jobs:
             -parallel-testing-enabled NO -destination-timeout 120 \
             -test-timeouts-enabled YES -default-test-execution-time-allowance 90 -maximum-test-execution-time-allowance 120 \
             CODE_SIGNING_ALLOWED=NO 2>&1 | xcbeautify --quiet
+      # When the app cannot be launched, say why: which tests ran, and the app's crash report.
+      # The simulator holds only the fictional fixture data; nothing from the app source is printed.
+      - name: Why the tests failed
+        if: failure()
+        run: |
+          if [ -d "$RUNNER_TEMP/TonariTests.xcresult" ]; then
+            xcrun xcresulttool get test-results tests --path "$RUNNER_TEMP/TonariTests.xcresult" --compact \
+              | python3 -c 'import json,sys
+          def walk(n,d=0):
+              if n.get("nodeType") in ("Test Case","Unit test bundle","UI test bundle","Test Suite"): print("  "*d+n.get("name","")+": "+n.get("result",""))
+              for c in n.get("children",[]): walk(c,d+1)
+          for t in json.load(sys.stdin).get("testNodes",[]): walk(t)' || true
+          fi
+          ls -t ~/Library/Logs/DiagnosticReports/ 2>/dev/null | head -20
+          for f in $(ls -t ~/Library/Logs/DiagnosticReports/Tonari* 2>/dev/null | head -1); do
+            echo "=== $f"; head -c 16000 "$f"; echo
+          done
+          xcrun simctl spawn "$SIMULATOR_UDID" log show --last 30m --style compact \
+            --predicate 'process == "Tonari" AND (messageType == error OR messageType == fault)' 2>/dev/null | tail -80 || true
       - name: Export test screenshots
         if: always()
         run: |
