@@ -9,7 +9,7 @@ on:
       source_ref:
         description: App source branch, tag or commit (private repository)
         required: true
-        default: claude/tonari-ios-ai-only-rt87vw
+        default: claude/ios-native
       status_build:
         description: Only report Apple's state of this uploaded build number (no build)
         required: false
@@ -48,7 +48,7 @@ jobs:
       DEVELOPER_DIR: /Applications/Xcode_26.3.app/Contents/Developer
       NSUnbufferedIO: YES
       TEAM_ID: 572NVCGLGQ
-      MARKETING_VERSION: 0.2.0
+      MARKETING_VERSION: 0.3.0
       # Build numbers stay above the builds already uploaded.
       BUILD_OFFSET: 100
     steps:
