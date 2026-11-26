@@ -8,12 +8,20 @@ on:
       source_ref:
         description: App source branch, tag or commit (private repository)
         required: true
-        default: claude/tonari-ios-ai-only-rt87vw
+        default: claude/ios-native
+      scope:
+        description: "core = only the Swift logic tests on Linux (about a minute); all = also the app on the simulator"
+        required: false
+        default: all
   workflow_call:
     inputs:
       source_ref:
         type: string
         required: true
+      scope:
+        type: string
+        required: false
+        default: all
     outputs:
       sha:
         description: Commit of the app source that passed
@@ -22,7 +30,29 @@ on:
 permissions:
   contents: read
 jobs:
+  # The app's logic (ios/TonariCore) has no Apple-only dependencies, so it is tested on Linux.
+  core:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - name: Check out the app source (private)
+        uses: actions/checkout@v5
+        with:
+          repository: ${{ vars.APP_SOURCE_REPO || 'mugi0227/Tonari' }}
+          ref: ${{ inputs.source_ref }}
+          ssh-key: ${{ secrets.APP_SOURCE_DEPLOY_KEY }}
+          path: app
+          persist-credentials: false
+      - name: TonariCore tests (Swift on Linux)
+        shell: bash
+        run: |
+          echo "App source: $(git -C app rev-parse HEAD)" >> "$GITHUB_STEP_SUMMARY"
+          if [ ! -f app/ios/TonariCore/Package.swift ]; then echo "No TonariCore in this source"; exit 0; fi
+          docker run --rm -v "$PWD/app/ios/TonariCore:/pkg" -w /pkg swift:6.2 swift test 2>&1
+
   test:
+    needs: core
+    if: inputs.scope != 'core'
     runs-on: macos-15
     timeout-minutes: 45
     outputs:
