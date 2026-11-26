@@ -12,6 +12,16 @@ on:
         description: Internal group to add the build to when it is not there yet (empty = report only)
         required: false
         default: ''
+  # Also reached from "Tonari iOS build" (status_build), which can be run from any branch.
+  workflow_call:
+    inputs:
+      build:
+        type: string
+        required: true
+      add_to_group:
+        type: string
+        required: false
+        default: ''
 
 permissions:
   contents: read

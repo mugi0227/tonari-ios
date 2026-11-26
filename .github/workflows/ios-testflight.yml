@@ -10,6 +10,14 @@ on:
         description: App source branch, tag or commit (private repository)
         required: true
         default: claude/tonari-ios-ai-only-rt87vw
+      status_build:
+        description: Only report Apple's state of this uploaded build number (no build)
+        required: false
+        default: ''
+      add_to_group:
+        description: With status_build, the internal TestFlight group to add the build to
+        required: false
+        default: ''
 
 permissions:
   contents: read
@@ -17,7 +25,16 @@ concurrency:
   group: tonari-ios-release
   cancel-in-progress: false
 jobs:
+  status:
+    if: inputs.status_build != ''
+    uses: ./.github/workflows/testflight-status.yml
+    with:
+      build: ${{ inputs.status_build }}
+      add_to_group: ${{ inputs.add_to_group }}
+    secrets: inherit
+
   test:
+    if: inputs.status_build == ''
     uses: ./.github/workflows/ios-tests.yml
     with:
       source_ref: ${{ inputs.source_ref }}
