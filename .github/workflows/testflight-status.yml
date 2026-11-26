@@ -1,0 +1,73 @@
+name: TestFlight build status
+
+# Reports Apple's processing state of one uploaded build and which internal TestFlight groups have
+# it; optionally adds it to the internal group. Prints only states and names, never credentials.
+on:
+  workflow_dispatch:
+    inputs:
+      build:
+        description: Build number (CFBundleVersion)
+        required: true
+      add_to_group:
+        description: Internal group to add the build to when it is not there yet (empty = report only)
+        required: false
+        default: ''
+
+permissions:
+  contents: read
+jobs:
+  status:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Ask App Store Connect
+        env:
+          ASC_KEY_ID: ${{ secrets.ASC_KEY_ID }}
+          ASC_ISSUER_ID: ${{ secrets.ASC_ISSUER_ID }}
+          ASC_KEY_P8: ${{ secrets.ASC_KEY_P8 }}
+          BUILD: ${{ inputs.build }}
+          GROUP: ${{ inputs.add_to_group }}
+        run: |
+          python3 -m venv "$RUNNER_TEMP/env"
+          "$RUNNER_TEMP/env/bin/pip" install --quiet PyJWT==2.10.1 cryptography==45.0.6
+          "$RUNNER_TEMP/env/bin/python" - <<'PY'
+          import json, os, time, urllib.parse, urllib.request
+          import jwt
+          now = int(time.time())
+          token = jwt.encode({'iss': os.environ['ASC_ISSUER_ID'], 'iat': now, 'exp': now + 600, 'aud': 'appstoreconnect-v1'},
+                             os.environ['ASC_KEY_P8'], algorithm='ES256', headers={'kid': os.environ['ASC_KEY_ID'], 'typ': 'JWT'})
+          def api(path, data=None, method=None):
+              request = urllib.request.Request('https://api.appstoreconnect.apple.com' + path,
+                  data=json.dumps(data).encode() if data is not None else None, method=method,
+                  headers={'Authorization': 'Bearer ' + token, 'Content-Type': 'application/json'})
+              with urllib.request.urlopen(request, timeout=30) as response:
+                  body = response.read()
+                  return json.loads(body) if body else {}
+          q = urllib.parse.urlencode
+          app = api('/v1/apps?' + q({'filter[bundleId]': 'jp.mugilab.tonari'}))['data'][0]
+          builds = api('/v1/builds?' + q({'filter[app]': app['id'], 'filter[version]': os.environ['BUILD'],
+                                          'include': 'buildBetaDetail,preReleaseVersion'}))
+          if not builds['data']:
+              print('Build', os.environ['BUILD'], 'is not in App Store Connect yet'); raise SystemExit(0)
+          build = builds['data'][0]
+          a = build['attributes']
+          print('build', a['version'], 'processingState', a['processingState'], 'expired', a.get('expired'),
+                'usesNonExemptEncryption', a.get('usesNonExemptEncryption'))
+          for item in builds.get('included', []):
+              if item['type'] == 'buildBetaDetails':
+                  print('internalBuildState', item['attributes'].get('internalBuildState'),
+                        'externalBuildState', item['attributes'].get('externalBuildState'))
+              if item['type'] == 'preReleaseVersions':
+                  print('version', item['attributes'].get('version'))
+          groups = api('/v1/apps/' + app['id'] + '/betaGroups?limit=50')['data']
+          for g in groups:
+              ids = [b['id'] for b in api('/v1/betaGroups/' + g['id'] + '/relationships/builds?limit=200')['data']]
+              print('group', repr(g['attributes']['name']), 'internal', g['attributes'].get('isInternalGroup'),
+                    'has build', build['id'] in ids)
+              wanted = os.environ.get('GROUP', '').strip()
+              if wanted and g['attributes']['name'] == wanted and build['id'] not in ids:
+                  assert g['attributes'].get('isInternalGroup'), 'Only internal groups are changed here'
+                  assert a['processingState'] == 'VALID', 'Wait until the build is VALID'
+                  api('/v1/betaGroups/' + g['id'] + '/relationships/builds', {'data': [{'type': 'builds', 'id': build['id']}]}, 'POST')
+                  print('added build', a['version'], 'to', repr(wanted))
+          PY
